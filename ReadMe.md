@@ -1,6 +1,6 @@
 # OBS Auto Screen Recorder
 
-Automatically starts and stops OBS Studio screen recording based on camera activity (Teams, Zoom, etc.) on Windows.
+Automatically starts and stops OBS Studio screen recording based on camera activity (Teams, Zoom, etc.).
 
 ---
 
