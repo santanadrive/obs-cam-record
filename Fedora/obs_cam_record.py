@@ -4,6 +4,7 @@ import time
 import subprocess
 import sys
 import os
+import glob
 import psutil
 from obswebsocket import obsws, requests
 
@@ -12,6 +13,8 @@ port = 4455
 password = ""  # Fill in your password if needed
 
 COOLDOWN_SECONDS = 300  # 5 minutes
+
+RECORDINGS_DIR = os.path.expanduser("~/Videos/Screencasts")  # Change if different
 
 
 def notify(msg):
@@ -44,7 +47,6 @@ def start_obs():
         if os.path.exists(path):
             print(f"DEBUG: Launching OBS at {path}...")
             subprocess.Popen([path, "--minimize-to-tray"])
-            # Wait a bit for the process to start
             for i in range(10):
                 if is_obs_running():
                     print("DEBUG: OBS successfully launched.")
@@ -96,14 +98,48 @@ def start_recording(ws):
     notify("OBS: Recording started!")
 
 
-def stop_recording(ws):
+def get_latest_recording(directory, extlist=("mp4", "mkv")):
+    files = []
+    for ext in extlist:
+        files += glob.glob(os.path.join(directory, f"*.{ext}"))
+    if not files:
+        return None
+    return max(files, key=os.path.getmtime)
+
+
+def prompt_for_comment():
+    try:
+        comment = subprocess.check_output(
+            ["zenity", "--entry", "--title=Recording Summary Comment", "--text=Enter a summary for your recording:"], universal_newlines=True
+        ).strip()
+        return comment
+    except Exception as e:
+        print("DEBUG: Zenity popup failed or cancelled:", e)
+        return None
+
+
+def write_comment_to_file(filepath, comment):
+    try:
+        subprocess.run(["exiftool", f"-comment={comment}", "-overwrite_original", filepath], check=True)
+        print("DEBUG: Comment written to", filepath)
+    except Exception as e:
+        print("DEBUG: exiftool failed:", e)
+
+
+def stop_recording(ws, recordings_dir):
     print("DEBUG: Stopping recording...")
     ws.call(requests.StopRecord())
     notify("OBS: Recording stopped.")
+    # Wait for file to be fully written
+    time.sleep(2)
+    latest_file = get_latest_recording(recordings_dir)
+    if latest_file:
+        comment = prompt_for_comment()
+        if comment:
+            write_comment_to_file(latest_file, comment)
 
 
 def is_camera_in_use():
-    # Only trigger if /dev/video0 is actually in use
     try:
         result = subprocess.run(["fuser", "/dev/video0"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         print(f"DEBUG: fuser /dev/video0 exit code: {result.returncode}")
@@ -122,7 +158,7 @@ if __name__ == "__main__":
     obs_started = False
     ws = None
     camera_was_on = False
-    camera_off_time = None  # When camera was last seen as "off"
+    camera_off_time = None
 
     try:
         while True:
@@ -141,16 +177,15 @@ if __name__ == "__main__":
                     ws = wait_for_obs_websocket(timeout=60)
                 if ws:
                     start_recording(ws)
-                camera_off_time = None  # cancel any pending OBS shutdown
+                camera_off_time = None
 
             elif not cam_on and camera_was_on:
                 print("DEBUG: Camera no longer in use. Stopping recording and starting cooldown timer...")
                 if ws:
-                    stop_recording(ws)
+                    stop_recording(ws, RECORDINGS_DIR)
                 camera_off_time = now
 
             elif not cam_on and camera_off_time:
-                # If camera has been off long enough, close OBS and reset
                 if now - camera_off_time >= COOLDOWN_SECONDS:
                     print(f"DEBUG: Camera unused for {COOLDOWN_SECONDS // 60} minutes. Closing OBS...")
                     if ws:
@@ -165,7 +200,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("DEBUG: Exiting...")
         if ws:
-            stop_recording(ws)
+            stop_recording(ws, RECORDINGS_DIR)
             ws.disconnect()
         if obs_started:
             close_obs()
