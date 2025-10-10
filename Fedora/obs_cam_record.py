@@ -11,6 +11,8 @@ from obswebsocket import obsws, requests
 host = "localhost"
 port = 4455
 password = ""  # Fill in your password if needed
+CAMERA_STABILITY_SECONDS = 2.0
+CHECK_INTERVAL_SECONDS = 0.2
 
 COOLDOWN_SECONDS = 300  # 5 minutes
 
@@ -167,17 +169,29 @@ if __name__ == "__main__":
             print(f"DEBUG: cam_on = {cam_on}, camera_was_on = {camera_was_on}, camera_off_time = {camera_off_time}")
 
             if cam_on and not camera_was_on:
-                print("DEBUG: Camera detected in use. Launching OBS (if needed)...")
-                if not obs_started:
-                    obs_started = start_obs()
+                print("DEBUG: Camera detected in use. Monitoring for 2 seconds to confirm...")
+
+                activation_time = time.time()
+                while time.time() - activation_time < CAMERA_STABILITY_SECONDS:
+                    # If camera turns off during this window, abort
+                    if not is_camera_in_use():
+                        print("DEBUG: Camera did not stay active for 2 seconds — skipping recording.")
+                        cam_on = False  # <-- keep state consistent so we don't trigger stop later
+                        break
+                    time.sleep(CHECK_INTERVAL_SECONDS)
+                else:
+                    # Only triggered if the camera stayed on for the full 2 seconds
+                    print("DEBUG: Camera stayed active for 2 seconds — proceeding to record.")
                     if not obs_started:
-                        print("DEBUG: Could not start OBS. Retrying...")
-                        time.sleep(5)
-                        continue
-                    ws = wait_for_obs_websocket(timeout=60)
-                if ws:
-                    start_recording(ws)
-                camera_off_time = None
+                        obs_started = start_obs()
+                        if not obs_started:
+                            print("DEBUG: Could not start OBS. Retrying...")
+                            time.sleep(5)
+                            continue
+                        ws = wait_for_obs_websocket(timeout=60)
+                    if ws:
+                        start_recording(ws)
+                    camera_off_time = None
 
             elif not cam_on and camera_was_on:
                 print("DEBUG: Camera no longer in use. Stopping recording and starting cooldown timer...")
