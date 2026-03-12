@@ -7,16 +7,28 @@ import os
 import glob
 import psutil
 from obswebsocket import obsws, requests
+from dotenv import load_dotenv
 
-host = "localhost"
-port = 4455
-password = ""  # Fill in your password if needed
-CAMERA_STABILITY_SECONDS = 2.0
-CHECK_INTERVAL_SECONDS = 0.2
+load_dotenv()
 
-COOLDOWN_SECONDS = 300  # 5 minutes
+# ===============================
+# Environment Variables
+# ===============================
 
-RECORDINGS_DIR = os.path.expanduser("~/Videos/Screencasts")  # Change if different
+HOST = os.getenv("OBS_HOST")
+PORT = int(os.getenv("OBS_PORT"))
+PASSWORD = os.getenv("OBS_PASSWORD")
+
+CAMERA_DEVICE = os.getenv("CAMERA_DEVICE")
+
+CAMERA_STABILITY_SECONDS = float(os.getenv("CAMERA_STABILITY_SECONDS"))
+CHECK_INTERVAL_SECONDS = float(os.getenv("CHECK_INTERVAL_SECONDS"))
+
+COOLDOWN_SECONDS = int(os.getenv("COOLDOWN_SECONDS"))
+
+RECORDINGS_DIR = os.getenv("RECORDINGS_DIR")
+
+# ===============================
 
 
 def notify(msg):
@@ -83,7 +95,7 @@ def wait_for_obs_websocket(timeout=60):
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            ws = obsws(host, port, password)
+            ws = obsws(HOST, PORT, PASSWORD)
             ws.connect()
             print("DEBUG: Connected to OBS WebSocket.")
             return ws
@@ -143,13 +155,16 @@ def stop_recording(ws, recordings_dir):
 
 def is_camera_in_use():
     try:
-        result = subprocess.run(["fuser", "/dev/video0"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        print(f"DEBUG: fuser /dev/video0 exit code: {result.returncode}")
+        result = subprocess.run(
+            ["fuser", CAMERA_DEVICE],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"DEBUG: fuser {CAMERA_DEVICE} exit code: {result.returncode}")
         if result.returncode == 0:
-            print("DEBUG: /dev/video0 is in use (fuser).")
+            print(f"DEBUG: {CAMERA_DEVICE} is in use (fuser).")
             return True
         else:
-            print("DEBUG: /dev/video0 is NOT in use (fuser).")
             return False
     except Exception as e:
         print(f"DEBUG: Exception in fuser: {e}")
