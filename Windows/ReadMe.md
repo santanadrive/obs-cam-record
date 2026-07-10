@@ -53,6 +53,8 @@ Automatically starts and stops OBS Studio screen recording based on camera activ
 
 - Click OK.
 
+> **Security tip:** If you use an OBS WebSocket password, avoid hard-coding it in your script. Prefer loading it from environment variables or a configuration file (such as `.env`) that is not committed to version control.
+
 ### 2. Set up your recording scene in OBS
 
 - In OBS, add a **Display Capture** source to the default Scene (this is required to record your desktop!).

@@ -33,7 +33,7 @@ This project provides a **background Python automation script** and a **systemd 
 Save your script to (for example):
 
 ```
-/home/santana/Github/obs-cam-record/Fedora/obs_cam_record.py
+~/Github/obs-cam-record/Fedora/obs_cam_record.py
 ```
 
 ### 2. Install requirements
@@ -48,6 +48,8 @@ sudo dnf install obs-studio libnotify
 - Launch OBS Studio
 - Open **Tools > WebSocket Server Settings**
 - Make sure it is enabled and running on port `4455` (default for OBS 28+)
+
+> **Security tip:** Keep your OBS WebSocket host, port, and password outside the script (for example in environment variables or a `.env` file) and do not commit those secrets to version control.
 
 ### 4. Create the systemd user service
 
@@ -64,7 +66,7 @@ Example contents:
 Description=OBS Camera Recorder Autostart
 
 [Service]
-ExecStart=/usr/bin/python3 /home/santana/Github/obs-cam-record/Fedora/obs_cam_record.py
+ExecStart=/usr/bin/python3 /home/<your-username>/Github/obs-cam-record/Fedora/obs_cam_record.py
 Restart=always
 RestartSec=5
 Environment="DISPLAY=:0"
